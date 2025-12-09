@@ -15,6 +15,7 @@ use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
+use League\Flysystem\UnableToListContents;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
@@ -214,7 +215,7 @@ class SharePointAdapter implements FilesystemAdapter
                 throw new \RuntimeException('Failed to create directory: '.$response->body());
             }
         } catch (Throwable $exception) {
-            throw UnableToCreateDirectory::dueToFailure($path, $exception);
+            throw UnableToCreateDirectory::atLocation($path, $exception->getMessage(), $exception);
         }
     }
 
@@ -266,7 +267,7 @@ class SharePointAdapter implements FilesystemAdapter
                 ->get($endpoint);
 
             if ($response->failed()) {
-                return;
+                throw new \RuntimeException('Failed to list contents: '.$response->body());
             }
 
             $items = $response->json()['value'] ?? [];
@@ -275,7 +276,7 @@ class SharePointAdapter implements FilesystemAdapter
                 // Fix path construction to properly handle path prefixes
                 $parentPath = $item['parentReference']['path'] ?? '';
                 $itemName = $item['name'] ?? '';
-                
+
                 // Extract the relative path from the parent reference
                 if (preg_match('/root:(.*)/', $parentPath, $matches)) {
                     $relativePath = trim($matches[1], '/');
@@ -283,7 +284,7 @@ class SharePointAdapter implements FilesystemAdapter
                 } else {
                     $itemPath = $itemName;
                 }
-                
+
                 $itemPath = $this->prefixer->stripPrefix($itemPath);
 
                 if (isset($item['folder'])) {
@@ -311,7 +312,7 @@ class SharePointAdapter implements FilesystemAdapter
                 }
             }
         } catch (Throwable $exception) {
-            return;
+            throw UnableToListContents::atLocation($path, $deep, $exception);
         }
     }
 
